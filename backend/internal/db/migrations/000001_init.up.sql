@@ -3,8 +3,6 @@
 -- Money/byte columns use BIGINT; -1 means "no limit" (NATS JWT semantics).
 -- audit_logs intentionally has no FKs: admin_id / tenant_id may be soft-deleted.
 
-BEGIN;
-
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- ---------- tenants ----------
@@ -91,5 +89,3 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER audit_logs_no_update
 BEFORE UPDATE OR DELETE ON audit_logs
 FOR EACH ROW EXECUTE FUNCTION audit_logs_no_modify();
-
-COMMIT;
