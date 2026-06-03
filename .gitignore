@@ -1,0 +1,21 @@
+# Go
+backend/server
+backend/migrate
+backend/bootstrap
+*.test
+*.out
+.env
+.env.local
+
+# Node
+frontend/node_modules
+frontend/dist
+frontend/.vite
+frontend/pnpm-lock.yaml
+
+# NATS
+nats/operator.jwt
+nats/resolver/
+
+# OS
+.DS_Store

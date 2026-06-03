@@ -1,0 +1,22 @@
+# Generated for local dev only.
+# In production, replace operator.jwt path and resolver dir.
+
+server_name: "nats-admin-dev"
+listen: "0.0.0.0:4222"
+http: "0.0.0.0:8222"
+# IMPORTANT: replaced by bootstrap output before first run
+# operator: "/etc/nats/operator.jwt"
+resolver: {
+  type:         full
+  dir:          "/data/nats/resolver"
+  allow_delete: true
+  interval:     "2m"
+}
+# system_account: "<SA... public key>"   # set after bootstrap
+
+leafnodes: {
+  listen: "0.0.0.0:7422"
+}
+
+debug: false
+trace:  false
