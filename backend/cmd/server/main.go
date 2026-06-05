@@ -15,8 +15,14 @@ import (
 	"github.com/chenxiaoli/nats-admin/internal/config"
 	"github.com/chenxiaoli/nats-admin/internal/credential"
 	"github.com/chenxiaoli/nats-admin/internal/db"
+	"github.com/chenxiaoli/nats-admin/internal/jetstream"
+	"github.com/chenxiaoli/nats-admin/internal/monitor"
 	"github.com/chenxiaoli/nats-admin/internal/operator"
 	"github.com/chenxiaoli/nats-admin/internal/tenant"
+	"github.com/google/uuid"
+	"github.com/nats-io/jwt/v2"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
 )
 
 func main() {
@@ -45,11 +51,43 @@ func run() error {
 		return fmt.Errorf("operator: %w", err)
 	}
 
-	var res *tenant.Resolver // nil in dev — resolver pushes will fail explicitly
-	_ = res
+	// System account connection for resolver + monitoring
+	var sysConn *nats.Conn
+	var res *tenant.Resolver
+	sysConn, err = connectSystemAccount(cfg, op)
+	if err != nil {
+		log.Printf("warn: system account connection failed: %v (resolver/monitor unavailable)", err)
+	} else {
+		res = tenant.NewResolver(sysConn)
+	}
 
 	tenantSvc := tenant.NewService(tenant.NewRepository(pool), res, op, cfg.MasterKey)
 	credSvc := credential.NewService(credential.NewPgRepository(pool), tenantSvc, op, cfg.MasterKey)
+
+	// JetStream: per-tenant connection pool
+	jsMgr := jetstream.NewManager(cfg.NATSURL)
+	defer jsMgr.Close()
+	jsAdmin := jetstream.NewAdmin(jsMgr, func(ctx context.Context, tenantID uuid.UUID) (string, string, error) {
+		seed, err := tenantSvc.AccountSeedForSigning(ctx, tenantID)
+		if err != nil {
+			return "", "", err
+		}
+		t, err := tenantSvc.Get(ctx, tenantID)
+		if err != nil {
+			return "", "", err
+		}
+		return t.AccountJWT, seed, nil
+	})
+
+	// Monitor
+	mon := monitor.NewMonitor(sysConn)
+	monHub := monitor.NewHub(mon)
+	go monHub.Start()
+	defer monHub.Stop()
+	defer mon.Stop()
+	if err := mon.Start(ctx); err != nil {
+		log.Printf("warn: monitor start failed: %v", err)
+	}
 
 	router := api.NewRouter(api.Deps{
 		Pool:      pool,
@@ -57,8 +95,8 @@ func run() error {
 		Auth:      handler.NewAuthHandler(pool, cfg.JWTSecret, cfg.JWTExpiry),
 		Tenants:   handler.NewTenantsHandler(tenantSvc),
 		Creds:     handler.NewCredentialsHandler(credSvc),
-		JS:        &handler.JetStreamHandler{},
-		Mon:       &handler.MonitorHandler{},
+		JS:        handler.NewJetStreamHandler(jsAdmin),
+		Mon:       handler.NewMonitorHandler(mon, monHub),
 	})
 
 	srv := &http.Server{
@@ -78,4 +116,24 @@ func run() error {
 
 	log.Printf("listening on :%s", cfg.Port)
 	return srv.ListenAndServe()
+}
+
+func connectSystemAccount(cfg *config.Config, op *operator.Operator) (*nats.Conn, error) {
+	// Reconstruct system account JWT from seed + operator signing
+	sakp, err := nkeys.FromSeed([]byte(cfg.SysAccountSeed))
+	if err != nil {
+		return nil, fmt.Errorf("parse sys account seed: %w", err)
+	}
+	saPub, _ := sakp.PublicKey()
+
+	claims := jwt.NewAccountClaims(saPub)
+	claims.Name = "SYS"
+	sysJWT, err := op.SignAccountClaims(claims)
+	if err != nil {
+		return nil, fmt.Errorf("sign system account jwt: %w", err)
+	}
+
+	return nats.Connect(cfg.NATSURL,
+		nats.UserJWTAndSeed(sysJWT, cfg.SysAccountSeed),
+	)
 }

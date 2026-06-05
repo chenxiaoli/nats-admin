@@ -1,8 +1,9 @@
 import { useLocation, useNavigate } from 'react-router';
 
 const items = [
+  { label: '概览', path: '/' },
   { label: '租户', path: '/tenants' },
-  { label: '监控', path: '/monitor', disabled: true },
+  { label: '监控', path: '/monitor' },
   { label: '设置', path: '/settings', disabled: true },
 ];
 

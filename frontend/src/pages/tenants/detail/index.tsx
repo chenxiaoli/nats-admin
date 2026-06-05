@@ -5,6 +5,7 @@ import { useTenant } from '@/api/tenants';
 const tabs = [
   { key: '', label: '概览' },
   { key: 'credentials', label: '凭证' },
+  { key: 'jetstream', label: 'JetStream' },
   { key: 'audit', label: '审计日志' },
 ] as const;
 
@@ -16,9 +17,11 @@ export default function TenantDetail() {
 
   const currentTab = location.pathname.split('/').pop() === 'credentials'
     ? 'credentials'
-    : location.pathname.split('/').pop() === 'audit'
-      ? 'audit'
-      : '';
+    : location.pathname.split('/').pop() === 'jetstream'
+      ? 'jetstream'
+      : location.pathname.split('/').pop() === 'audit'
+        ? 'audit'
+        : '';
 
   if (isLoading) return <div className="text-slate-500">加载中…</div>;
   if (error) return <div className="text-red-600">加载失败</div>;

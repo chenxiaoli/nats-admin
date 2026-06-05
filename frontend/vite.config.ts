@@ -11,6 +11,8 @@ export default defineConfig({
     port: 5173,
     host: '0.0.0.0',
     allowedHosts: ['nats-admin-dev.sztitan.com'],
-    proxy: { '/api': 'http://localhost:8080' },
+    proxy: {
+      '/api': { target: 'http://localhost:8080', ws: true },
+    },
   },
 });
