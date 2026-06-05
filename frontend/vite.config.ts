@@ -7,5 +7,10 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(__dirname, 'src') },
   },
-  server: { port: 5173, proxy: { '/api': 'http://localhost:8080' } },
+  server: {
+    port: 5173,
+    host: '0.0.0.0',
+    allowedHosts: ['nats-admin-dev.sztitan.com'],
+    proxy: { '/api': 'http://localhost:8080' },
+  },
 });

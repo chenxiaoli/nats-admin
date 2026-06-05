@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { client } from '@/api/client';
+import { setToken } from '@/lib/auth';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('admin@example.com');
@@ -11,7 +12,7 @@ export default function LoginPage() {
   const submit = async () => {
     try {
       const r = await client.post('/auth/login', { email, password });
-      localStorage.setItem('admin_token', r.data.token);
+      setToken(r.data.token);
       nav('/tenants');
     } catch {
       setErr('登录失败');

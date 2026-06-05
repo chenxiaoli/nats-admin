@@ -13,20 +13,20 @@ import (
 var ErrNotFound = errors.New("tenant not found")
 
 type Tenant struct {
-	ID                 uuid.UUID
-	Name               string
-	Slug               string
-	AccountPublicKey   string
-	AccountJWT         string
-	JSMemoryStorage    int64
-	JSDiskStorage      int64
-	JSMaxStreams       int32
-	JSMaxConsumers     int32
-	MaxConnections     int32
-	MaxSubscriptions   int32
-	Status             string
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	ID                 uuid.UUID `json:"id"`
+	Name               string    `json:"name"`
+	Slug               string    `json:"slug"`
+	AccountPublicKey   string    `json:"account_public_key"`
+	AccountJWT         string    `json:"account_jwt"`
+	JSMemoryStorage    int64     `json:"js_max_memory_storage"`
+	JSDiskStorage      int64     `json:"js_max_disk_storage"`
+	JSMaxStreams       int32     `json:"js_max_streams"`
+	JSMaxConsumers     int32     `json:"js_max_consumers"`
+	MaxConnections     int32     `json:"max_connections"`
+	MaxSubscriptions   int32     `json:"max_subscriptions"`
+	Status             string    `json:"status"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 type Repository struct {

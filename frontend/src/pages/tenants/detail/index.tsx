@@ -1,33 +1,49 @@
-import { useParams } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
+import { Link } from 'react-router';
 import { useTenant } from '@/api/tenants';
-import { formatBytes, formatNumber } from '@/lib/utils';
+
+const tabs = [
+  { key: '', label: '概览' },
+  { key: 'credentials', label: '凭证' },
+  { key: 'audit', label: '审计日志' },
+] as const;
 
 export default function TenantDetail() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { data, isLoading, error } = useTenant(id!);
 
-  if (isLoading) return <div className="p-6">加载中…</div>;
-  if (error) return <div className="p-6 text-red-600">加载失败</div>;
+  const currentTab = location.pathname.split('/').pop() === 'credentials'
+    ? 'credentials'
+    : location.pathname.split('/').pop() === 'audit'
+      ? 'audit'
+      : '';
+
+  if (isLoading) return <div className="text-slate-500">加载中…</div>;
+  if (error) return <div className="text-red-600">加载失败</div>;
   if (!data) return null;
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">{data.name}</h1>
-      <div className="grid grid-cols-2 gap-4 text-sm">
-        <div><span className="text-slate-500">Slug：</span><span className="font-mono">{data.slug}</span></div>
-        <div><span className="text-slate-500">状态：</span>{data.status}</div>
-        <div><span className="text-slate-500">Account 公钥：</span><span className="font-mono">{data.account_public_key}</span></div>
-        <div><span className="text-slate-500">JS Memory：</span>{formatBytes(data.js_max_memory_storage)}</div>
-        <div><span className="text-slate-500">JS Disk：</span>{formatBytes(data.js_max_disk_storage)}</div>
-        <div><span className="text-slate-500">JS Streams：</span>{formatNumber(data.js_max_streams)}</div>
-        <div><span className="text-slate-500">JS Consumers：</span>{formatNumber(data.js_max_consumers)}</div>
-        <div><span className="text-slate-500">Max Connections：</span>{formatNumber(data.max_connections)}</div>
-        <div><span className="text-slate-500">Max Subscriptions：</span>{formatNumber(data.max_subscriptions)}</div>
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Link to="/tenants" className="text-sm text-slate-500 hover:text-slate-900">← 租户列表</Link>
+        <h1 className="text-2xl font-semibold">{data.name}</h1>
       </div>
-      <div>
-        <h2 className="text-lg font-semibold">Account JWT</h2>
-        <pre className="overflow-auto rounded bg-slate-100 p-3 text-xs">{data.account_jwt}</pre>
+
+      <div className="flex gap-1 border-b">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => navigate(`/tenants/${id}/${t.key ? t.key : ''}`)}
+            className={`px-4 py-2 text-sm ${currentTab === t.key ? 'border-b-2 border-slate-900 font-medium' : 'text-slate-500 hover:text-slate-900'}`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
+
+      <Outlet context={{ tenant: data, tenantId: id! }} />
     </div>
   );
 }
