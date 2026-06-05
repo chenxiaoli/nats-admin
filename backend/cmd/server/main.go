@@ -10,13 +10,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/allen/nats-admin/internal/api"
-	"github.com/allen/nats-admin/internal/api/handler"
-	"github.com/allen/nats-admin/internal/config"
-	"github.com/allen/nats-admin/internal/credential"
-	"github.com/allen/nats-admin/internal/db"
-	"github.com/allen/nats-admin/internal/operator"
-	"github.com/allen/nats-admin/internal/tenant"
+	"github.com/chenxiaoli/nats-admin/internal/api"
+	"github.com/chenxiaoli/nats-admin/internal/api/handler"
+	"github.com/chenxiaoli/nats-admin/internal/config"
+	"github.com/chenxiaoli/nats-admin/internal/credential"
+	"github.com/chenxiaoli/nats-admin/internal/db"
+	"github.com/chenxiaoli/nats-admin/internal/operator"
+	"github.com/chenxiaoli/nats-admin/internal/tenant"
 )
 
 func main() {

@@ -1,4 +1,4 @@
-module github.com/allen/nats-admin
+module github.com/chenxiaoli/nats-admin
 
 go 1.25.0
 

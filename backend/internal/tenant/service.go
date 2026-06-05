@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/allen/nats-admin/internal/crypto"
-	"github.com/allen/nats-admin/internal/operator"
+	"github.com/chenxiaoli/nats-admin/internal/crypto"
+	"github.com/chenxiaoli/nats-admin/internal/operator"
 	"github.com/google/uuid"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"

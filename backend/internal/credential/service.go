@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/allen/nats-admin/internal/crypto"
-	"github.com/allen/nats-admin/internal/operator"
-	"github.com/allen/nats-admin/internal/tenant"
+	"github.com/chenxiaoli/nats-admin/internal/crypto"
+	"github.com/chenxiaoli/nats-admin/internal/operator"
+	"github.com/chenxiaoli/nats-admin/internal/tenant"
 	"github.com/google/uuid"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"

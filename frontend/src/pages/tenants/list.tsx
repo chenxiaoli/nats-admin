@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useTenants } from '@/api/tenants';
 
 export default function TenantsList() {

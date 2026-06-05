@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/allen/nats-admin/internal/api/middleware"
-	"github.com/allen/nats-admin/internal/credential"
+	"github.com/chenxiaoli/nats-admin/internal/api/middleware"
+	"github.com/chenxiaoli/nats-admin/internal/credential"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )

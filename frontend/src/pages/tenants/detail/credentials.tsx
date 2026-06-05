@@ -1,4 +1,5 @@
-import { useOutletContext, useState } from 'react-router';
+import { useOutletContext } from 'react-router';
+import { useState } from 'react';
 import type { Tenant } from '@/api/tenants';
 import { useCredentials, useIssueCredential, useRevokeCredential } from '@/api/credentials';
 import CredsDialog from '@/components/credential/creds-dialog';

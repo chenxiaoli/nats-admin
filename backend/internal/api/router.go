@@ -1,8 +1,8 @@
 package api
 
 import (
-	"github.com/allen/nats-admin/internal/api/handler"
-	"github.com/allen/nats-admin/internal/api/middleware"
+	"github.com/chenxiaoli/nats-admin/internal/api/handler"
+	"github.com/chenxiaoli/nats-admin/internal/api/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
