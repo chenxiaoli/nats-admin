@@ -3,6 +3,7 @@ package tenant
 import (
 	"context"
 	"fmt"
+	"log"
 	"regexp"
 
 	"github.com/chenxiaoli/nats-admin/internal/crypto"
@@ -207,6 +208,17 @@ func (s *Service) AccountSeedForSigning(ctx context.Context, id uuid.UUID) (stri
 	return string(pt), nil
 }
 
+// AccountKeyPair returns the decrypted account NKey for a tenant. Callers
+// that need to sign user JWTs (e.g. the JetStream manager when establishing
+// per-tenant connections) use this to derive user credentials.
+func (s *Service) AccountKeyPair(ctx context.Context, id uuid.UUID) (nkeys.KeyPair, error) {
+	seed, err := s.AccountSeedForSigning(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return nkeys.FromSeed([]byte(seed))
+}
+
 // UpdateAccountJWT overwrites the tenants.account_jwt column.
 func (s *Service) UpdateAccountJWT(ctx context.Context, id uuid.UUID, jwtStr string) error {
 	_, err := s.repo.Pool().Exec(ctx, `UPDATE tenants SET account_jwt=$2, updated_at=NOW() WHERE id=$1`, id, jwtStr)
@@ -219,4 +231,30 @@ func (s *Service) PushAccountJWT(ctx context.Context, _ uuid.UUID, jwtStr string
 		return ErrPushUnreachable
 	}
 	return s.resolver.Push(ctx, jwtStr)
+}
+
+// ReconcileAll pushes every active tenant's account JWT to the resolver.
+// Idempotent: $SYS.REQ.CLAIMS.UPDATE overwrites the existing entry.
+// Used at backend startup so a wiped resolver (fresh container / disk loss)
+// is repopulated from the DB without manual intervention.
+func (s *Service) ReconcileAll(ctx context.Context) (pushed, failed int, err error) {
+	if s.resolver == nil {
+		return 0, 0, ErrPushUnreachable
+	}
+	tenants, err := s.List(ctx)
+	if err != nil {
+		return 0, 0, fmt.Errorf("list tenants: %w", err)
+	}
+	for _, t := range tenants {
+		if t.Status != "active" {
+			continue
+		}
+		if pushErr := s.resolver.Push(ctx, t.AccountJWT); pushErr != nil {
+			failed++
+			log.Printf("reconcile: push %s (%s) failed: %v", t.Name, t.AccountPublicKey, pushErr)
+			continue
+		}
+		pushed++
+	}
+	return pushed, failed, nil
 }

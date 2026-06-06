@@ -48,30 +48,42 @@ func (m *Monitor) Start(ctx context.Context) error {
 		return nil
 	}
 
-	// Subscribe to server stats
-	sub1, err := m.conn.Subscribe("$SYS.SERVER.*.STATZ", func(msg *nats.Msg) {
-		var stats struct {
+	// Subscribe to server stats. NATS 2.10 publishes these to
+	// $SYS.SERVER.<sid>.STATSZ (note the trailing Z) on a server interval
+	// (default 1m). Earlier doc that called the suffix "STATZ" was wrong.
+	sub1, err := m.conn.Subscribe("$SYS.SERVER.*.STATSZ", func(msg *nats.Msg) {
+		var raw struct {
 			Server struct {
 				Name string `json:"name"`
 				ID   string `json:"id"`
 			} `json:"server"`
-			Connections int   `json:"connections"`
-			Subscriptions int `json:"subscriptions"`
-			InMsgs      int64 `json:"in_msgs"`
-			OutMsgs     int64 `json:"out_msgs"`
-			InBytes     int64 `json:"in_bytes"`
-			OutBytes    int64 `json:"out_bytes"`
-			Uptime      string `json:"uptime"`
+			Statsz struct {
+				Connections   int   `json:"connections"`
+				Subscriptions int   `json:"subscriptions"`
+				Received      struct {
+					Msgs  int64 `json:"msgs"`
+					Bytes int64 `json:"bytes"`
+				} `json:"received"`
+				Sent struct {
+					Msgs  int64 `json:"msgs"`
+					Bytes int64 `json:"bytes"`
+				} `json:"sent"`
+				Start time.Time `json:"start"`
+			} `json:"statsz"`
 		}
-		if err := json.Unmarshal(msg.Data, &stats); err != nil {
+		if err := json.Unmarshal(msg.Data, &raw); err != nil {
 			return
 		}
 		s := ServerStats{
-			Name: stats.Server.Name, ID: stats.Server.ID,
-			Connections: stats.Connections, Subscriptions: stats.Subscriptions,
-			InMsgs: stats.InMsgs, OutMsgs: stats.OutMsgs,
-			InBytes: stats.InBytes, OutBytes: stats.OutBytes,
-			Uptime: stats.Uptime,
+			Name:         raw.Server.Name,
+			ID:           raw.Server.ID,
+			Connections:  raw.Statsz.Connections,
+			Subscriptions: raw.Statsz.Subscriptions,
+			InMsgs:       raw.Statsz.Received.Msgs,
+			OutMsgs:      raw.Statsz.Sent.Msgs,
+			InBytes:      raw.Statsz.Received.Bytes,
+			OutBytes:     raw.Statsz.Sent.Bytes,
+			Uptime:       time.Since(raw.Statsz.Start).Truncate(time.Second).String(),
 		}
 		m.mu.Lock()
 		defer m.mu.Unlock()
@@ -91,22 +103,24 @@ func (m *Monitor) Start(ctx context.Context) error {
 		return err
 	}
 
-	// Subscribe to account stats
-	sub2, err := m.conn.Subscribe("$SYS.SERVER.ACCOUNT.*.STATZ", func(msg *nats.Msg) {
-		var stats struct {
-			AccountID string `json:"account_id"`
-			Connections int `json:"connections"`
-			TotalConns  int `json:"total_connections"`
+	// Subscribe to per-account connection events. NATS publishes these to
+	// $SYS.SERVER.ACCOUNT.<pubkey>.CONNS (not "STATZ") at the account-stat
+	// interval (default ~10s). Each payload is a single account's snapshot.
+	sub2, err := m.conn.Subscribe("$SYS.SERVER.ACCOUNT.*.CONNS", func(msg *nats.Msg) {
+		var raw struct {
+			Acc        string `json:"acc"`
+			Conns      int    `json:"conns"`
+			TotalConns int    `json:"total_conns"`
 		}
-		if err := json.Unmarshal(msg.Data, &stats); err != nil {
+		if err := json.Unmarshal(msg.Data, &raw); err != nil {
 			return
 		}
 		m.mu.Lock()
 		defer m.mu.Unlock()
-		m.accounts[stats.AccountID] = AccountStats{
-			AccountID:   stats.AccountID,
-			Connections: stats.Connections,
-			TotalConns:  stats.TotalConns,
+		m.accounts[raw.Acc] = AccountStats{
+			AccountID:   raw.Acc,
+			Connections: raw.Conns,
+			TotalConns:  raw.TotalConns,
 		}
 	})
 	if err != nil {

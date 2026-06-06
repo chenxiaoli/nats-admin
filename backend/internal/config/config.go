@@ -14,6 +14,7 @@ type Config struct {
 	Env                    string
 	DatabaseURL            string
 	NATSURL                string
+	ResolverDir            string
 	OperatorSeed           string
 	SysAccountSeed         string
 	MasterKey              []byte
@@ -68,6 +69,7 @@ func Load() (*Config, error) {
 		Env:                    v.GetString("ENV"),
 		DatabaseURL:            v.GetString("DATABASE_URL"),
 		NATSURL:                v.GetString("NATS_URL"),
+		ResolverDir:            v.GetString("RESOLVER_DIR"),
 		OperatorSeed:           v.GetString("OPERATOR_SEED"),
 		SysAccountSeed:         v.GetString("SYSTEM_ACCOUNT_SEED"),
 		MasterKey:              mk,
@@ -82,6 +84,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("PORT", "8080")
 	v.SetDefault("ENV", "development")
 	v.SetDefault("JWT_EXPIRY", "24h")
+	v.SetDefault("RESOLVER_DIR", "/data/nats/resolver")
 	v.SetDefault("BOOTSTRAP_ADMIN_EMAIL", "admin@example.com")
 	v.SetDefault("BOOTSTRAP_ADMIN_PASSWORD", "changeme")
 }

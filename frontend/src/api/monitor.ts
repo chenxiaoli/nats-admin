@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { client } from './client';
 
@@ -23,8 +24,8 @@ export const useServerStats = () =>
   useQuery({
     queryKey: ['monitor', 'servers'],
     queryFn: async () => {
-      const r = await client.get<{ servers: ServerStats[] }>('/monitor/server');
-      return r.data.servers ?? [];
+      const r = await client.get('/monitor/server');
+      return (r.data as { servers: ServerStats[] }).servers ?? [];
     },
     refetchInterval: 10000,
   });
@@ -33,8 +34,8 @@ export const useAccountStats = () =>
   useQuery({
     queryKey: ['monitor', 'accounts'],
     queryFn: async () => {
-      const r = await client.get<{ accounts: AccountStats[]> }>('/monitor/tenants');
-      return r.data.accounts ?? [];
+      const r = await client.get('/monitor/tenants');
+      return (r.data as { accounts: AccountStats[] }).accounts ?? [];
     },
     refetchInterval: 10000,
   });
@@ -50,5 +51,3 @@ export function useMonitorWS() {
   }, []);
   return data;
 }
-
-import { useState, useEffect } from 'react';

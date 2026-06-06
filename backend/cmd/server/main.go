@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -51,6 +52,14 @@ func run() error {
 		return fmt.Errorf("operator: %w", err)
 	}
 
+	// Seed the system account JWT into the resolver directory if missing.
+	// Without this, NATS rejects sys-account connections with "Authorization
+	// Violation" because the resolver has no record of the system account.
+	// Idempotent — overwrites the file only if contents differ.
+	if err := seedSystemAccountJWT(cfg, op); err != nil {
+		log.Printf("warn: seed system account jwt: %v (resolver may be unreachable)", err)
+	}
+
 	// System account connection for resolver + monitoring
 	var sysConn *nats.Conn
 	var res *tenant.Resolver
@@ -64,19 +73,35 @@ func run() error {
 	tenantSvc := tenant.NewService(tenant.NewRepository(pool), res, op, cfg.MasterKey)
 	credSvc := credential.NewService(credential.NewPgRepository(pool), tenantSvc, op, cfg.MasterKey)
 
+	// Reconcile resolver with DB on startup: repopulate any tenant JWTs that
+	// are missing from the resolver (e.g. after a fresh container / wiped disk).
+	// Idempotent — safe to run on every boot.
+	if res != nil {
+		if pushed, failed, err := tenantSvc.ReconcileAll(ctx); err != nil {
+			log.Printf("warn: reconcile failed: %v", err)
+		} else {
+			log.Printf("reconcile: pushed %d tenant jwt(s) to resolver (%d skipped/failed)", pushed, failed)
+		}
+	}
+
 	// JetStream: per-tenant connection pool
 	jsMgr := jetstream.NewManager(cfg.NATSURL)
 	defer jsMgr.Close()
 	jsAdmin := jetstream.NewAdmin(jsMgr, func(ctx context.Context, tenantID uuid.UUID) (string, string, error) {
-		seed, err := tenantSvc.AccountSeedForSigning(ctx, tenantID)
+		// Each per-tenant NATS connection uses a freshly minted user under the
+		// tenant's account — NATS rejects account JWTs as client credentials
+		// with "User JWT not valid: not user claim". The user keypair can be
+		// ephemeral since we sign the JWT on every connect from the account
+		// seed; the resolver still holds the account JWT.
+		akp, err := tenantSvc.AccountKeyPair(ctx, tenantID)
 		if err != nil {
 			return "", "", err
 		}
-		t, err := tenantSvc.Get(ctx, tenantID)
+		userJWT, userSeed, err := mintBackendUser(akp, "admin")
 		if err != nil {
 			return "", "", err
 		}
-		return t.AccountJWT, seed, nil
+		return userJWT, userSeed, nil
 	})
 
 	// Monitor
@@ -119,21 +144,99 @@ func run() error {
 }
 
 func connectSystemAccount(cfg *config.Config, op *operator.Operator) (*nats.Conn, error) {
-	// Reconstruct system account JWT from seed + operator signing
+	// Reconstruct the system account and create a system user under it.
+	// A client connects with a User JWT (signed by its account) — not the
+	// account JWT itself, which the resolver stores. NATS rejects the account
+	// JWT with "User JWT not valid: not user claim".
 	sakp, err := nkeys.FromSeed([]byte(cfg.SysAccountSeed))
 	if err != nil {
 		return nil, fmt.Errorf("parse sys account seed: %w", err)
 	}
 	saPub, _ := sakp.PublicKey()
 
-	claims := jwt.NewAccountClaims(saPub)
-	claims.Name = "SYS"
-	sysJWT, err := op.SignAccountClaims(claims)
+	ukp, err := nkeys.CreateUser()
 	if err != nil {
-		return nil, fmt.Errorf("sign system account jwt: %w", err)
+		return nil, fmt.Errorf("create sys user nkey: %w", err)
+	}
+	uPub, _ := ukp.PublicKey()
+	uSeed, _ := ukp.Seed()
+
+	claims := jwt.NewUserClaims(uPub)
+	claims.Name = "sys"
+	claims.IssuerAccount = saPub
+	claims.Permissions = jwt.Permissions{
+		Pub: jwt.Permission{Allow: []string{">"}},
+		Sub: jwt.Permission{Allow: []string{">"}},
+	}
+	sysUserJWT, err := claims.Encode(sakp)
+	if err != nil {
+		return nil, fmt.Errorf("sign sys user jwt: %w", err)
 	}
 
 	return nats.Connect(cfg.NATSURL,
-		nats.UserJWTAndSeed(sysJWT, cfg.SysAccountSeed),
+		nats.UserJWTAndSeed(sysUserJWT, string(uSeed)),
 	)
+}
+
+func seedSystemAccountJWT(cfg *config.Config, op *operator.Operator) error {
+	sakp, err := nkeys.FromSeed([]byte(cfg.SysAccountSeed))
+	if err != nil {
+		return fmt.Errorf("parse sys account seed: %w", err)
+	}
+	saPub, _ := sakp.PublicKey()
+
+	claims := jwt.NewAccountClaims(saPub)
+	claims.Name = "SYS"
+	// System account needs wildcard $SYS permissions to act as server-internal
+	// account (it owns all $SYS.* subjects that stats and control messages
+	// flow through).
+	claims.DefaultPermissions = jwt.Permissions{
+		Pub: jwt.Permission{Allow: []string{">"}},
+		Sub: jwt.Permission{Allow: []string{">"}},
+	}
+	sysJWT, err := op.SignAccountClaims(claims)
+	if err != nil {
+		return fmt.Errorf("sign system account jwt: %w", err)
+	}
+
+	if err := os.MkdirAll(cfg.ResolverDir, 0o755); err != nil {
+		return fmt.Errorf("mkdir resolver dir: %w", err)
+	}
+	path := filepath.Join(cfg.ResolverDir, saPub+".jwt")
+	existing, readErr := os.ReadFile(path)
+	if readErr == nil && string(existing) == sysJWT {
+		return nil // already seeded
+	}
+	if err := os.WriteFile(path, []byte(sysJWT), 0o644); err != nil {
+		return fmt.Errorf("write system jwt: %w", err)
+	}
+	log.Printf("seeded system account jwt → %s", path)
+	return nil
+}
+
+// mintBackendUser creates a fresh user NKey and signs a user JWT for the given
+// account. The user keypair is ephemeral — callers (per-tenant JetStream
+// connections) can regenerate it on demand. Permissions are wildcard so the
+// backend can manage Streams, KV, OBJ, etc. on the tenant's behalf.
+func mintBackendUser(akp nkeys.KeyPair, name string) (string, string, error) {
+	ukp, err := nkeys.CreateUser()
+	if err != nil {
+		return "", "", fmt.Errorf("create user nkey: %w", err)
+	}
+	uPub, _ := ukp.PublicKey()
+	uSeed, _ := ukp.Seed()
+
+	apub, _ := akp.PublicKey()
+	claims := jwt.NewUserClaims(uPub)
+	claims.Name = name
+	claims.IssuerAccount = apub
+	claims.Permissions = jwt.Permissions{
+		Pub: jwt.Permission{Allow: []string{">"}},
+		Sub: jwt.Permission{Allow: []string{">"}},
+	}
+	userJWT, err := claims.Encode(akp)
+	if err != nil {
+		return "", "", fmt.Errorf("sign user jwt: %w", err)
+	}
+	return userJWT, string(uSeed), nil
 }

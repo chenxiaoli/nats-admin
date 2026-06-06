@@ -4,8 +4,13 @@ backend/migrate
 backend/bootstrap
 *.test
 *.out
+*.prof
+coverage.*
+
+# Env
 .env
 .env.local
+.env.*.local
 
 # Node
 frontend/node_modules
@@ -15,6 +20,30 @@ frontend/.vite
 # NATS
 nats/operator.jwt
 nats/resolver/
+nats/nats.log
+nats/data/
+
+# Sensitive — credential files must never be committed
+*.creds
+*.nk
+*.pem
+*.key
+*.crt
 
 # OS
 .DS_Store
+Thumbs.db
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Docker
+docker-compose.override.yml
+
+# Misc
+tmp/
+*.log

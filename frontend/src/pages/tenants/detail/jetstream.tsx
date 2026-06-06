@@ -1,4 +1,5 @@
-import { useOutletContext, useState } from 'react';
+import { useOutletContext } from 'react-router';
+import { useState } from 'react';
 import { useStreams, useCreateStream, useDeleteStream, usePurgeStream, useKVBuckets, useCreateKV, useDeleteKV } from '@/api/jetstream';
 import ConfirmDialog, { useConfirm } from '@/components/ui/confirm-dialog';
 import { formatBytes, formatNumber } from '@/lib/utils';
@@ -61,7 +62,7 @@ function StreamsTab({ tenantId }: { tenantId: string }) {
           <tr>
             <th className="p-2">名称</th>
             <th className="p-2">Subjects</th>
-            <th className="p-2">消��数</th>
+            <th className="p-2">消息数</th>
             <th className="p-2">大小</th>
             <th className="p-2" />
           </tr>
