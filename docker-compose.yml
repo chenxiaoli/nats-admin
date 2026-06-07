@@ -1,21 +1,4 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: nats-admin-postgres
-    environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: secret
-      POSTGRES_DB: nats_admin
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d nats_admin"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   nats:
     image: nats:2.10-alpine
     container_name: nats-admin-nats
@@ -33,41 +16,22 @@ services:
       timeout: 5s
       retries: 10
 
-  migrate:
-    build: ./backend
-    entrypoint: ["nats-admin", "migrate", "up", "postgres://admin:secret@postgres:5432/nats_admin?sslmode=disable"]
-    environment:
-      MIGRATIONS_DIR: /migrations
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  backend:
-    build: ./backend
+  nats-admin:
+    image: ghcr.io/chenxiaoli/nats-admin:latest
     container_name: nats-admin-backend
+    command: ["server"]
     ports:
       - "8080:8080"
     depends_on:
-      postgres:
-        condition: service_healthy
       nats:
         condition: service_healthy
+    env_file: .env
     environment:
       PORT: "8080"
-      ENV: production
-      DATABASE_URL: postgres://admin:secret@postgres:5432/nats_admin?sslmode=disable
       NATS_URL: nats://nats:4222
       RESOLVER_DIR: /data/nats/resolver
-      OPERATOR_SEED: ${OPERATOR_SEED:?set OPERATOR_SEED in .env}
-      SYSTEM_ACCOUNT_SEED: ${SYSTEM_ACCOUNT_SEED:?set SYSTEM_ACCOUNT_SEED in .env}
-      MASTER_KEY: ${MASTER_KEY:?set MASTER_KEY in .env}
-      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
-      JWT_EXPIRY: 24h
-      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
-      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-changeme}
     volumes:
       - nats_data:/data/nats
 
 volumes:
-  postgres_data:
   nats_data:
