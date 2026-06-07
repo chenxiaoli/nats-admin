@@ -35,7 +35,7 @@ services:
 
   migrate:
     build: ./backend
-    entrypoint: ["migrate", "up", "postgres://admin:secret@postgres:5432/nats_admin?sslmode=disable"]
+    entrypoint: ["nats-admin", "migrate", "up", "postgres://admin:secret@postgres:5432/nats_admin?sslmode=disable"]
     environment:
       MIGRATIONS_DIR: /migrations
     depends_on:
