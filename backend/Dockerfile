@@ -3,8 +3,7 @@ FROM node:22-alpine AS frontend
 WORKDIR /src/frontend
 COPY frontend/package.json frontend/pnpm-lock.yaml* ./
 RUN corepack enable && corepack prepare pnpm@latest --activate && \
-    pnpm config set auto-install-peers true && \
-    pnpm install --frozen-lockfile --config.onlyBuiltDependencies="esbuild"
+    pnpm install --frozen-lockfile
 COPY frontend ./
 RUN pnpm build
 
