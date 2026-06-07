@@ -32,6 +32,10 @@ func WithAudit(pool *pgxpool.Pool) func(http.Handler) http.Handler {
 			entry.adminID = AdminID(r.Context())
 			entry.tenantID = TenantID(r.Context())
 			detail, _ := json.Marshal(entry.detail)
+			if pool == nil {
+				// Audit disabled (e.g. unit tests that don't wire a DB).
+				return
+			}
 			_, err := pool.Exec(r.Context(),
 				`INSERT INTO audit_logs (admin_id, tenant_id, action, resource, ip_addr, detail) VALUES ($1,$2,$3,$4,$5,$6)`,
 				entry.adminID, entry.tenantID, entry.action, entry.resource, r.RemoteAddr, detail)

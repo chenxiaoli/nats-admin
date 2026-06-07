@@ -115,13 +115,14 @@ func run() error {
 	}
 
 	router := api.NewRouter(api.Deps{
-		Pool:      pool,
-		JWTSecret: cfg.JWTSecret,
-		Auth:      handler.NewAuthHandler(pool, cfg.JWTSecret, cfg.JWTExpiry),
-		Tenants:   handler.NewTenantsHandler(tenantSvc),
-		Creds:     handler.NewCredentialsHandler(credSvc),
-		JS:        handler.NewJetStreamHandler(jsAdmin),
-		Mon:       handler.NewMonitorHandler(mon, monHub),
+		Pool:       pool,
+		JWTSecret:  cfg.JWTSecret,
+		Auth:       handler.NewAuthHandler(pool, cfg.JWTSecret, cfg.JWTExpiry),
+		Tenants:    handler.NewTenantsHandler(tenantSvc),
+		Creds:      handler.NewCredentialsHandler(credSvc),
+		JS:         handler.NewJetStreamHandler(jsAdmin),
+		Mon:        handler.NewMonitorHandler(mon, monHub),
+		FrontendFS: frontendFS,
 	})
 
 	srv := &http.Server{

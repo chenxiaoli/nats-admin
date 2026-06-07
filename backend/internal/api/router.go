@@ -1,6 +1,8 @@
 package api
 
 import (
+	"io/fs"
+
 	"github.com/chenxiaoli/nats-admin/internal/api/handler"
 	"github.com/chenxiaoli/nats-admin/internal/api/middleware"
 	"github.com/go-chi/chi/v5"
@@ -9,13 +11,14 @@ import (
 )
 
 type Deps struct {
-	Pool      *pgxpool.Pool
-	JWTSecret []byte
-	Auth      *handler.AuthHandler
-	Tenants   *handler.TenantsHandler
-	Creds     *handler.CredentialsHandler
-	JS        *handler.JetStreamHandler
-	Mon       *handler.MonitorHandler
+	Pool       *pgxpool.Pool
+	JWTSecret  []byte
+	Auth       *handler.AuthHandler
+	Tenants    *handler.TenantsHandler
+	Creds      *handler.CredentialsHandler
+	JS         *handler.JetStreamHandler
+	Mon        *handler.MonitorHandler
+	FrontendFS fs.FS
 }
 
 func NewRouter(d Deps) *chi.Mux {
@@ -63,5 +66,12 @@ func NewRouter(d Deps) *chi.Mux {
 			r.Get("/ws/monitor", d.Mon.WebSocket)
 		})
 	})
+
+	// Catch-all for embedded frontend. /api/v1/* and /ws/* above take
+	// precedence; anything else falls through to the static handler which
+	// serves index.html for unknown paths (SPA client-side routing).
+	if d.FrontendFS != nil {
+		r.Handle("/*", staticHandler(d.FrontendFS))
+	}
 	return r
 }
