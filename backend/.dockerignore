@@ -1,0 +1,4 @@
+nats/
+*.jwt
+.env
+.env.*

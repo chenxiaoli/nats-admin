@@ -18,9 +18,12 @@ func main() {
 		fmt.Fprintln(os.Stderr, "usage: migrate <up|down|version|force V> <dsn>")
 		os.Exit(2)
 	}
-	dir, _ := os.Getwd()
-	migrationsDir := filepath.Join(dir, "internal", "db", "migrations")
-	src := "file://" + migrationsDir
+	dir := os.Getenv("MIGRATIONS_DIR")
+	if dir == "" {
+		dir, _ = os.Getwd()
+		dir = filepath.Join(dir, "internal", "db", "migrations")
+	}
+	src := "file://" + dir
 	dsn := os.Args[2]
 
 	m, err := migrate.New(src, dsn)

@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -34,6 +32,41 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  migrate:
+    build: ./backend
+    entrypoint: ["migrate", "up", "postgres://admin:secret@postgres:5432/nats_admin?sslmode=disable"]
+    environment:
+      MIGRATIONS_DIR: /migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    build: ./backend
+    container_name: nats-admin-backend
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    environment:
+      PORT: "8080"
+      ENV: production
+      DATABASE_URL: postgres://admin:secret@postgres:5432/nats_admin?sslmode=disable
+      NATS_URL: nats://nats:4222
+      RESOLVER_DIR: /data/nats/resolver
+      OPERATOR_SEED: ${OPERATOR_SEED:?set OPERATOR_SEED in .env}
+      SYSTEM_ACCOUNT_SEED: ${SYSTEM_ACCOUNT_SEED:?set SYSTEM_ACCOUNT_SEED in .env}
+      MASTER_KEY: ${MASTER_KEY:?set MASTER_KEY in .env}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT_EXPIRY: 24h
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-changeme}
+    volumes:
+      - nats_data:/data/nats
 
 volumes:
   postgres_data:
