@@ -1,0 +1,54 @@
+# Git
+.git
+.gitignore
+
+# Sensitive — never leak credentials
+nats
+backend/nats
+*.jwt
+*.creds
+*.nk
+*.pem
+*.key
+*.crt
+.env
+.env.*
+backend/.env
+backend/nats/operator.jwt
+
+# Frontend build artifacts (will be produced inside the build)
+frontend/node_modules
+frontend/dist
+frontend/.vite
+
+# Backend build artifacts
+backend/server
+backend/migrate
+backend/bootstrap
+backend/frontend_dist
+backend/.dockerignore
+
+# Go test/build cache
+*.test
+*.out
+*.prof
+coverage.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Docker
+docker-compose.override.yml
+
+# Docs / plans (not needed for build)
+docs
+
+# Existing build outputs
+*.log
+tmp
