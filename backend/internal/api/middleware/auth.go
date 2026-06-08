@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -18,6 +19,8 @@ func AdminID(ctx context.Context) uuid.UUID {
 	return v
 }
 
+const wwwAuthSessionExpired = "SessionExpired"
+
 func RequireAdmin(secret []byte) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +36,14 @@ func RequireAdmin(secret []byte) func(http.Handler) http.Handler {
 				}
 				return secret, nil
 			})
-			if err != nil || !parsed.Valid {
+			if err != nil {
+				if errors.Is(err, jwt.ErrTokenExpired) {
+					w.Header().Set("WWW-Authenticate", wwwAuthSessionExpired)
+				}
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			if !parsed.Valid {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
