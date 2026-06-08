@@ -50,30 +50,26 @@ func runBootstrap() error {
 		return fmt.Errorf("encode operator jwt: %w", err)
 	}
 
-	// 4. System Account JWT (signed by Operator)
-	saClaims := jwt.NewAccountClaims(saPub)
-	saClaims.Name = "SYS"
-	systemJWT, err := saClaims.Encode(okp)
-	if err != nil {
-		return fmt.Errorf("encode system account jwt: %w", err)
-	}
-
-	// 5. Write operator.jwt into nats/ dir
+	// 4. Write operator.jwt into nats/ dir
 	if err := writeOperatorJWT(operatorJWT); err != nil {
 		return err
 	}
 
-	// 6. Print seeds + public keys to stdout (NOT to file)
+	// 5. Print seeds + public keys to stdout
 	fmt.Println("=== NATS Admin Bootstrap ===")
 	fmt.Printf("OPERATOR_NAME=%s\n", operatorName)
 	fmt.Printf("OPERATOR_PUBLIC_KEY=%s\n", opPub)
 	fmt.Printf("OPERATOR_SEED=%s\n", string(opSeed))
 	fmt.Printf("SYSTEM_ACCOUNT_PUBLIC_KEY=%s\n", saPub)
 	fmt.Printf("SYSTEM_ACCOUNT_SEED=%s\n", string(saSeed))
-	fmt.Println("=== Add the two *SEED lines to backend/.env manually ===")
-	fmt.Println("=== operator.jwt written to nats/operator.jwt ===")
-	fmt.Println("=== After NATS server starts, push system account JWT to resolver: ===")
-	fmt.Printf("=== System Account JWT: %s ===\n", systemJWT)
+	fmt.Println()
+	fmt.Println("Next steps:")
+	fmt.Println("  1. Add OPERATOR_SEED and SYSTEM_ACCOUNT_SEED to .env")
+	fmt.Println("  2. Update system_account in nats/server.conf with SYSTEM_ACCOUNT_PUBLIC_KEY")
+	fmt.Println("  3. Start NATS server, then start nats-admin server")
+	fmt.Println("     (server will auto-seed System Account JWT into resolver)")
+	fmt.Println()
+	fmt.Printf("operator.jwt written to nats/operator.jwt\n")
 	return nil
 }
 
