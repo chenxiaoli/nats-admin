@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router/dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { loginLoader } from './components/layout/auth-layout';
 import AuthLayout, { authLoader } from './components/layout/auth-layout';
+import ReauthProvider from '@/components/auth/reauth-provider';
 import LoginPage from './pages/login';
 import DashboardPage from './pages/dashboard';
 import TenantsList from './pages/tenants/list';
@@ -53,7 +54,9 @@ const qc = new QueryClient();
 export default function App() {
   return (
     <QueryClientProvider client={qc}>
-      <RouterProvider router={router} />
+      <ReauthProvider>
+        <RouterProvider router={router} />
+      </ReauthProvider>
     </QueryClientProvider>
   );
 }
