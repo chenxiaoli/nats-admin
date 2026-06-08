@@ -84,7 +84,6 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("PORT", "8080")
 	v.SetDefault("ENV", "development")
 	v.SetDefault("JWT_EXPIRY", "24h")
-	v.SetDefault("RESOLVER_DIR", "/data/nats/resolver")
 	v.SetDefault("BOOTSTRAP_ADMIN_EMAIL", "admin@example.com")
 	v.SetDefault("BOOTSTRAP_ADMIN_PASSWORD", "changeme")
 }

@@ -29,9 +29,6 @@ services:
     environment:
       PORT: "8080"
       NATS_URL: nats://nats:4222
-      RESOLVER_DIR: /data/nats/resolver
-    volumes:
-      - nats_data:/data/nats
 
 volumes:
   nats_data:

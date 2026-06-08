@@ -46,8 +46,10 @@ func runServer() error {
 		return fmt.Errorf("operator: %w", err)
 	}
 
-	if err := seedSystemAccountJWT(cfg, op); err != nil {
-		log.Printf("warn: seed system account jwt: %v (resolver may be unreachable)", err)
+	if cfg.ResolverDir != "" {
+		if err := seedSystemAccountJWT(cfg, op); err != nil {
+			log.Printf("warn: seed system account jwt: %v", err)
+		}
 	}
 
 	var sysConn *nats.Conn
@@ -57,6 +59,9 @@ func runServer() error {
 		log.Printf("warn: system account connection failed: %v (resolver/monitor unavailable)", err)
 	} else {
 		res = tenant.NewResolver(sysConn)
+		if err := pushSystemAccountJWT(ctx, cfg, op, res); err != nil {
+			log.Printf("warn: push system account jwt to cluster: %v", err)
+		}
 	}
 
 	tenantSvc := tenant.NewService(tenant.NewRepository(pool), res, op, cfg.MasterKey)
@@ -184,6 +189,31 @@ func seedSystemAccountJWT(cfg *config.Config, op *operator.Operator) error {
 		return fmt.Errorf("write system jwt: %w", err)
 	}
 	log.Printf("seeded system account jwt → %s", path)
+	return nil
+}
+
+func pushSystemAccountJWT(ctx context.Context, cfg *config.Config, op *operator.Operator, res *tenant.Resolver) error {
+	sakp, err := nkeys.FromSeed([]byte(cfg.SysAccountSeed))
+	if err != nil {
+		return fmt.Errorf("parse sys account seed: %w", err)
+	}
+	saPub, _ := sakp.PublicKey()
+
+	claims := jwt.NewAccountClaims(saPub)
+	claims.Name = "SYS"
+	claims.DefaultPermissions = jwt.Permissions{
+		Pub: jwt.Permission{Allow: []string{">"}},
+		Sub: jwt.Permission{Allow: []string{">"}},
+	}
+	sysJWT, err := op.SignAccountClaims(claims)
+	if err != nil {
+		return fmt.Errorf("sign system account jwt: %w", err)
+	}
+
+	if err := res.Push(ctx, sysJWT); err != nil {
+		return fmt.Errorf("push: %w", err)
+	}
+	log.Printf("pushed system account jwt (%s) to cluster", saPub)
 	return nil
 }
 
