@@ -53,6 +53,9 @@ jobs:
           name: frontend-dist
           path: backend/cmd/nats-admin/frontend_dist
 
+      - name: Copy migrations for embedding
+        run: cp -r backend/internal/db/migrations backend/cmd/nats-admin/migrations
+
       - uses: actions/setup-go@v5
         with:
           go-version: 1.25

@@ -1,29 +1,44 @@
 package main
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
+	"io/fs"
 
 	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 func runMigrate(args []string) error {
 	if len(args) < 2 {
 		return fmt.Errorf("usage: nats-admin migrate <up|down|version> <dsn>")
 	}
-	dir := os.Getenv("MIGRATIONS_DIR")
-	if dir == "" {
-		dir, _ = os.Getwd()
-		dir = filepath.Join(dir, "internal", "db", "migrations")
-	}
-	src := "file://" + dir
-	dsn := args[1]
 
-	m, err := migrate.New(src, dsn)
+	dsn := args[1]
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		return fmt.Errorf("open db: %w", err)
+	}
+	defer db.Close()
+
+	driver, err := postgres.WithInstance(db, &postgres.Config{})
+	if err != nil {
+		return fmt.Errorf("migrate driver: %w", err)
+	}
+
+	sub, err := fs.Sub(migrationsFS, "migrations")
+	if err != nil {
+		return fmt.Errorf("migrate fs: %w", err)
+	}
+	src, err := iofs.New(sub, ".")
+	if err != nil {
+		return fmt.Errorf("migrate source: %w", err)
+	}
+
+	m, err := migrate.NewWithInstance("iofs", src, "postgres", driver)
 	if err != nil {
 		return fmt.Errorf("migrate init: %w", err)
 	}

@@ -18,6 +18,7 @@ RUN cd backend && go mod download
 COPY backend/ ./backend/
 
 COPY --from=frontend /src/frontend/dist ./backend/cmd/nats-admin/frontend_dist/
+COPY backend/internal/db/migrations ./backend/cmd/nats-admin/migrations/
 
 RUN cd backend && CGO_ENABLED=0 go build -ldflags="-s -w" -o /bin/nats-admin ./cmd/nats-admin
 
@@ -25,7 +26,6 @@ FROM alpine:3.20
 
 RUN apk add --no-cache ca-certificates tzdata
 COPY --from=builder /bin/nats-admin /usr/local/bin/nats-admin
-COPY backend/internal/db/migrations /migrations
 
 EXPOSE 8080
 ENTRYPOINT ["nats-admin"]
