@@ -25,10 +25,18 @@ services:
     depends_on:
       nats:
         condition: service_healthy
-    env_file: .env
     environment:
       PORT: "8080"
+      ENV: production
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
       NATS_URL: nats://nats:4222
+      OPERATOR_SEED: ${OPERATOR_SEED:?set OPERATOR_SEED}
+      SYSTEM_ACCOUNT_SEED: ${SYSTEM_ACCOUNT_SEED:?set SYSTEM_ACCOUNT_SEED}
+      MASTER_KEY: ${MASTER_KEY:?set MASTER_KEY}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      JWT_EXPIRY: ${JWT_EXPIRY:-24h}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-changeme}
 
 volumes:
   nats_data:
