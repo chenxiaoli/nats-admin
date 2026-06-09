@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"embed"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -106,7 +108,7 @@ func runServer() error {
 		Creds:      handler.NewCredentialsHandler(credSvc),
 		JS:         handler.NewJetStreamHandler(jsAdmin),
 		Mon:        handler.NewMonitorHandler(mon, monHub),
-		FrontendFS: frontendFS,
+		FrontendFS: mustSub(frontendFS, "frontend_dist"),
 	})
 
 	srv := &http.Server{
@@ -238,4 +240,12 @@ func mintBackendUser(akp nkeys.KeyPair, name string) (string, string, error) {
 		return "", "", fmt.Errorf("sign user jwt: %w", err)
 	}
 	return userJWT, string(uSeed), nil
+}
+
+func mustSub(fsys embed.FS, dir string) fs.FS {
+	sub, err := fs.Sub(fsys, dir)
+	if err != nil {
+		panic(err)
+	}
+	return sub
 }
