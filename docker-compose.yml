@@ -9,6 +9,7 @@ services:
       - "8223:8223"
     volumes:
       - ./nats/server.conf:/etc/nats/server.conf:ro
+      - ./nats/operator.jwt:/etc/nats/operator.jwt:ro
       - nats_data:/data/nats
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8222/healthz"]
