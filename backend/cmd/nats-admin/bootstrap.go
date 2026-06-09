@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -79,6 +78,5 @@ func writeOperatorJWT(token string) error {
 		return fmt.Errorf("mkdir nats/: %w", err)
 	}
 	path := filepath.Join(dir, "operator.jwt")
-	out, _ := json.MarshalIndent(map[string]string{"operator": token}, "", "  ")
-	return os.WriteFile(path, out, 0o600)
+	return os.WriteFile(path, []byte(token), 0o600)
 }
