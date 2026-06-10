@@ -98,6 +98,12 @@ func runServer() error {
 			return "", "", err
 		}
 		return userJWT, userSeed, nil
+	}, func(ctx context.Context, tenantID uuid.UUID) error {
+		t, err := tenantSvc.Get(ctx, tenantID)
+		if err != nil {
+			return err
+		}
+		return tenantSvc.PushAccountJWT(ctx, tenantID, t.AccountJWT)
 	})
 
 	mon := monitor.NewMonitor(sysConn)

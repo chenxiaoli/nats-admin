@@ -105,6 +105,32 @@ func (h *JetStreamHandler) DeleteKV(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *JetStreamHandler) ListConsumers(w http.ResponseWriter, r *http.Request) {
+	tid := middleware.TenantID(r.Context())
+	stream := chi.URLParam(r, "name")
+	consumers, err := h.admin.ListConsumers(r.Context(), tid, stream)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if consumers == nil {
+		consumers = []jetstream.ConsumerInfo{}
+	}
+	writeJSON(w, map[string]any{"consumers": consumers})
+}
+
+func (h *JetStreamHandler) GetConsumer(w http.ResponseWriter, r *http.Request) {
+	tid := middleware.TenantID(r.Context())
+	stream := chi.URLParam(r, "name")
+	consumer := chi.URLParam(r, "consumer")
+	ci, err := h.admin.GetConsumer(r.Context(), tid, stream, consumer)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, ci)
+}
+
 type MonitorHandler struct {
 	mon *monitor.Monitor
 	hub *monitor.Hub

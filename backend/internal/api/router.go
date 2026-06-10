@@ -57,6 +57,8 @@ func NewRouter(d Deps) *chi.Mux {
 					r.Post("/jetstream/streams", d.JS.CreateStream)
 					r.Delete("/jetstream/streams/{name}", d.JS.DeleteStream)
 					r.Post("/jetstream/streams/{name}/purge", d.JS.PurgeStream)
+					r.Get("/jetstream/streams/{name}/consumers", d.JS.ListConsumers)
+					r.Get("/jetstream/streams/{name}/consumers/{consumer}", d.JS.GetConsumer)
 					r.Get("/jetstream/kv", d.JS.ListKV)
 					r.Post("/jetstream/kv", d.JS.CreateKV)
 					r.Delete("/jetstream/kv/{bucket}", d.JS.DeleteKV)
@@ -71,6 +73,7 @@ func NewRouter(d Deps) *chi.Mux {
 			r.Get("/monitor/tenants", d.Mon.Tenants)
 			r.Get("/monitor/tenants/{id}", d.Mon.TenantStats)
 			r.Get("/ws/monitor", d.Mon.WebSocket)
+				r.Post("/admin/reconcile", d.Tenants.Reconcile)
 		})
 	})
 

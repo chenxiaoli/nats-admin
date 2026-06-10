@@ -1,6 +1,7 @@
 import { useOutletContext } from 'react-router';
 import { useState } from 'react';
-import { useStreams, useCreateStream, useDeleteStream, usePurgeStream, useKVBuckets, useCreateKV, useDeleteKV } from '@/api/jetstream';
+import { useStreams, useCreateStream, useDeleteStream, usePurgeStream, useKVBuckets, useCreateKV, useDeleteKV, useConsumers } from '@/api/jetstream';
+import type { StreamInfo } from '@/api/jetstream';
 import ConfirmDialog, { useConfirm } from '@/components/ui/confirm-dialog';
 import { formatBytes, formatNumber } from '@/lib/utils';
 import type { Tenant } from '@/api/tenants';
@@ -29,6 +30,7 @@ function StreamsTab({ tenantId }: { tenantId: string }) {
   const purgeStream = usePurgeStream(tenantId);
   const { confirmProps, confirm } = useConfirm();
   const [showCreate, setShowCreate] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', subjects: '', max_bytes: -1, max_msgs: -1 });
 
   const handleCreate = () => {
@@ -60,6 +62,7 @@ function StreamsTab({ tenantId }: { tenantId: string }) {
       <table className="w-full text-sm">
         <thead className="bg-slate-100 text-left">
           <tr>
+            <th className="p-2 w-6" />
             <th className="p-2">名称</th>
             <th className="p-2">Subjects</th>
             <th className="p-2">消息数</th>
@@ -69,18 +72,17 @@ function StreamsTab({ tenantId }: { tenantId: string }) {
         </thead>
         <tbody>
           {data?.map((s) => (
-            <tr key={s.name} className="border-b">
-              <td className="p-2 font-mono text-xs">{s.name}</td>
-              <td className="p-2 text-xs">{s.subjects?.join(', ') || '—'}</td>
-              <td className="p-2">{formatNumber(s.messages)}</td>
-              <td className="p-2">{formatBytes(s.bytes)}</td>
-              <td className="p-2 space-x-2">
-                <button onClick={() => handlePurge(s.name)} className="text-sm text-yellow-600 hover:underline">清空</button>
-                <button onClick={() => handleDelete(s.name)} className="text-sm text-red-600 hover:underline">删除</button>
-              </td>
-            </tr>
+            <StreamRow
+              key={s.name}
+              tenantId={tenantId}
+              stream={s}
+              expanded={expanded === s.name}
+              onToggle={() => setExpanded(expanded === s.name ? null : s.name)}
+              onPurge={handlePurge}
+              onDelete={handleDelete}
+            />
           ))}
-          {!data?.length && <tr><td colSpan={5} className="p-4 text-center text-slate-400">暂无 Stream</td></tr>}
+          {!data?.length && <tr><td colSpan={6} className="p-4 text-center text-slate-400">暂无 Stream</td></tr>}
         </tbody>
       </table>
 
@@ -117,6 +119,76 @@ function StreamsTab({ tenantId }: { tenantId: string }) {
       )}
       <ConfirmDialog {...confirmProps} />
     </div>
+  );
+}
+
+function StreamRow({ tenantId, stream, expanded, onToggle, onPurge, onDelete }: {
+  tenantId: string;
+  stream: StreamInfo;
+  expanded: boolean;
+  onToggle: () => void;
+  onPurge: (name: string) => void;
+  onDelete: (name: string) => void;
+}) {
+  return (
+    <>
+      <tr className="border-b">
+        <td className="p-2 text-center">
+          <button onClick={onToggle} className="text-slate-400 hover:text-slate-600 text-xs">
+            {expanded ? '▼' : '▶'}
+          </button>
+        </td>
+        <td className="p-2 font-mono text-xs">{stream.name}</td>
+        <td className="p-2 text-xs">{stream.subjects?.join(', ') || '—'}</td>
+        <td className="p-2">{formatNumber(stream.messages)}</td>
+        <td className="p-2">{formatBytes(stream.bytes)}</td>
+        <td className="p-2 space-x-2">
+          <button onClick={() => onPurge(stream.name)} className="text-sm text-yellow-600 hover:underline">清空</button>
+          <button onClick={() => onDelete(stream.name)} className="text-sm text-red-600 hover:underline">删除</button>
+        </td>
+      </tr>
+      {expanded && (
+        <tr>
+          <td colSpan={6} className="bg-slate-50 px-6 py-3">
+            <ConsumersPanel tenantId={tenantId} stream={stream.name} />
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function ConsumersPanel({ tenantId, stream }: { tenantId: string; stream: string }) {
+  const { data, isLoading } = useConsumers(tenantId, stream);
+
+  if (isLoading) return <div className="text-xs text-slate-400">加载 Consumer…</div>;
+  if (!data?.length) return <div className="text-xs text-slate-400">该 Stream 暂无 Consumer</div>;
+
+  return (
+    <table className="w-full text-xs">
+      <thead className="text-left text-slate-500">
+        <tr>
+          <th className="p-1.5">Consumer</th>
+          <th className="p-1.5">未消费</th>
+          <th className="p-1.5">待 Ack</th>
+          <th className="p-1.5">已投递到</th>
+          <th className="p-1.5">Ack 位</th>
+          <th className="p-1.5">重投递</th>
+        </tr>
+      </thead>
+      <tbody>
+        {data.map((c) => (
+          <tr key={c.name} className="border-t border-slate-200">
+            <td className="p-1.5 font-mono">{c.name}</td>
+            <td className="p-1.5 font-semibold text-orange-600">{formatNumber(c.num_pending)}</td>
+            <td className="p-1.5">{c.num_ack_pending}</td>
+            <td className="p-1.5">{formatNumber(c.delivered_stream_seq)}</td>
+            <td className="p-1.5">{formatNumber(c.ack_floor_stream_seq)}</td>
+            <td className="p-1.5">{c.num_redelivered}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 

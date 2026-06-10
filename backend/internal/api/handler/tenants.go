@@ -142,3 +142,13 @@ func (h *TenantsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	middleware.AuditSet(r, "tenant", map[string]any{"id": id, "action": "delete"})
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *TenantsHandler) Reconcile(w http.ResponseWriter, r *http.Request) {
+	pushed, failed, err := h.svc.ReconcileAll(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	middleware.AuditSet(r, "admin", map[string]any{"action": "reconcile", "pushed": pushed, "failed": failed})
+	writeJSON(w, map[string]any{"pushed": pushed, "failed": failed})
+}

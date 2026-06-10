@@ -2,7 +2,9 @@ package jetstream
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
@@ -13,6 +15,17 @@ type StreamInfo struct {
 	Subjects []string `json:"subjects"`
 	Messages uint64   `json:"messages"`
 	Bytes    uint64   `json:"bytes"`
+}
+
+type ConsumerInfo struct {
+	Name           string `json:"name"`
+	Stream         string `json:"stream"`
+	NumPending     uint64 `json:"num_pending"`
+	NumAckPending  int    `json:"num_ack_pending"`
+	NumRedelivered int    `json:"num_redelivered"`
+	DeliveredStreamSeq  uint64 `json:"delivered_stream_seq"`
+	AckFloorStreamSeq   uint64 `json:"ack_floor_stream_seq"`
+	Created string `json:"created"`
 }
 
 type CreateStreamReq struct {
@@ -38,10 +51,11 @@ type CreateKVReq struct {
 type Admin struct {
 	mgr       *Manager
 	getTenant func(ctx context.Context, id uuid.UUID) (jwtStr, seed string, err error)
+	reseed    func(ctx context.Context, id uuid.UUID) error
 }
 
-func NewAdmin(mgr *Manager, getTenant func(ctx context.Context, id uuid.UUID) (string, string, error)) *Admin {
-	return &Admin{mgr: mgr, getTenant: getTenant}
+func NewAdmin(mgr *Manager, getTenant func(ctx context.Context, id uuid.UUID) (string, string, error), reseed func(ctx context.Context, id uuid.UUID) error) *Admin {
+	return &Admin{mgr: mgr, getTenant: getTenant, reseed: reseed}
 }
 
 func (a *Admin) js(ctx context.Context, tenantID uuid.UUID) (nats.JetStreamContext, error) {
@@ -49,7 +63,17 @@ func (a *Admin) js(ctx context.Context, tenantID uuid.UUID) (nats.JetStreamConte
 	if err != nil {
 		return nil, fmt.Errorf("get tenant creds: %w", err)
 	}
-	return a.mgr.GetJS(tenantID, jwtStr, seed)
+	js, err := a.mgr.GetJS(tenantID, jwtStr, seed)
+	if err != nil {
+		if !errors.Is(err, nats.ErrAuthorization) || a.reseed == nil {
+			return nil, err
+		}
+		if reseedErr := a.reseed(ctx, tenantID); reseedErr != nil {
+			return nil, fmt.Errorf("auth violation (reseed failed: %v): %w", reseedErr, err)
+		}
+		return a.mgr.GetJS(tenantID, jwtStr, seed)
+	}
+	return js, nil
 }
 
 func (a *Admin) ListStreams(ctx context.Context, tenantID uuid.UUID) ([]StreamInfo, error) {
@@ -167,4 +191,50 @@ func (a *Admin) DeleteKV(ctx context.Context, tenantID uuid.UUID, bucket string)
 		return err
 	}
 	return js.DeleteKeyValue(bucket)
+}
+
+func (a *Admin) ListConsumers(ctx context.Context, tenantID uuid.UUID, stream string) ([]ConsumerInfo, error) {
+	js, err := a.js(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	ch := js.ConsumersInfo(stream)
+	var out []ConsumerInfo
+	for ci := range ch {
+		if ci == nil {
+			break
+		}
+		out = append(out, ConsumerInfo{
+			Name:                ci.Name,
+			Stream:              ci.Stream,
+			NumPending:          ci.NumPending,
+			NumAckPending:       ci.NumAckPending,
+			NumRedelivered:      ci.NumRedelivered,
+			DeliveredStreamSeq:  ci.Delivered.Stream,
+			AckFloorStreamSeq:   ci.AckFloor.Stream,
+			Created:             ci.Created.Format(time.RFC3339),
+		})
+	}
+	return out, nil
+}
+
+func (a *Admin) GetConsumer(ctx context.Context, tenantID uuid.UUID, stream, consumer string) (*ConsumerInfo, error) {
+	js, err := a.js(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	ci, err := js.ConsumerInfo(stream, consumer)
+	if err != nil {
+		return nil, fmt.Errorf("consumer info: %w", err)
+	}
+	return &ConsumerInfo{
+		Name:                ci.Name,
+		Stream:              ci.Stream,
+		NumPending:          ci.NumPending,
+		NumAckPending:       ci.NumAckPending,
+		NumRedelivered:      ci.NumRedelivered,
+		DeliveredStreamSeq:  ci.Delivered.Stream,
+		AckFloorStreamSeq:   ci.AckFloor.Stream,
+		Created:             ci.Created.Format(time.RFC3339),
+	}, nil
 }

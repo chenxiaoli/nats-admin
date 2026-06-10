@@ -14,6 +14,17 @@ export interface KVBucketInfo {
   history: number;
 }
 
+export interface ConsumerInfo {
+  name: string;
+  stream: string;
+  num_pending: number;
+  num_ack_pending: number;
+  num_redelivered: number;
+  delivered_stream_seq: number;
+  ack_floor_stream_seq: number;
+  created: string;
+}
+
 export const useStreams = (tenantId: string) =>
   useQuery({
     queryKey: ['streams', tenantId],
@@ -85,3 +96,13 @@ export const useDeleteKV = (tenantId: string) => {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['kv', tenantId] }),
   });
 };
+
+export const useConsumers = (tenantId: string, stream: string) =>
+  useQuery({
+    queryKey: ['consumers', tenantId, stream],
+    queryFn: async () => {
+      const r = await client.get<{ consumers: ConsumerInfo[] }>(`/tenants/${tenantId}/jetstream/streams/${stream}/consumers`);
+      return r.data.consumers ?? [];
+    },
+    enabled: !!tenantId && !!stream,
+  });
