@@ -15,6 +15,7 @@ import (
 
 	"github.com/chenxiaoli/nats-admin/internal/api"
 	"github.com/chenxiaoli/nats-admin/internal/api/handler"
+	"github.com/chenxiaoli/nats-admin/internal/apikey"
 	"github.com/chenxiaoli/nats-admin/internal/config"
 	"github.com/chenxiaoli/nats-admin/internal/credential"
 	"github.com/chenxiaoli/nats-admin/internal/db"
@@ -74,6 +75,8 @@ func runServer() error {
 
 	tenantSvc := tenant.NewService(tenant.NewRepository(pool), res, op, cfg.MasterKey)
 	credSvc := credential.NewService(credential.NewPgRepository(pool), tenantSvc, op, cfg.MasterKey)
+	apikeyRepo := apikey.NewPgRepository(pool)
+	apikeySvc := apikey.NewService(apikeyRepo)
 
 	if res != nil {
 		if pushed, failed, err := tenantSvc.ReconcileAll(ctx); err != nil {
@@ -107,14 +110,16 @@ func runServer() error {
 	}
 
 	router := api.NewRouter(api.Deps{
-		Pool:       pool,
-		JWTSecret:  cfg.JWTSecret,
-		Auth:       handler.NewAuthHandler(pool, cfg.JWTSecret, cfg.JWTExpiry),
-		Tenants:    handler.NewTenantsHandler(tenantSvc),
-		Creds:      handler.NewCredentialsHandler(credSvc),
-		JS:         handler.NewJetStreamHandler(jsAdmin),
-		Mon:        handler.NewMonitorHandler(mon, monHub),
-		FrontendFS: mustSub(frontendFS, "frontend_dist"),
+		Pool:          pool,
+		JWTSecret:     cfg.JWTSecret,
+		Authenticator: apikeySvc,
+		APIKeys:       handler.NewAPIKeysHandler(apikeySvc),
+		Auth:          handler.NewAuthHandler(pool, cfg.JWTSecret, cfg.JWTExpiry),
+		Tenants:       handler.NewTenantsHandler(tenantSvc),
+		Creds:         handler.NewCredentialsHandler(credSvc),
+		JS:            handler.NewJetStreamHandler(jsAdmin),
+		Mon:           handler.NewMonitorHandler(mon, monHub),
+		FrontendFS:    mustSub(frontendFS, "frontend_dist"),
 	})
 
 	srv := &http.Server{

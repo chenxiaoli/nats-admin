@@ -11,14 +11,16 @@ import (
 )
 
 type Deps struct {
-	Pool       *pgxpool.Pool
-	JWTSecret  []byte
-	Auth       *handler.AuthHandler
-	Tenants    *handler.TenantsHandler
-	Creds      *handler.CredentialsHandler
-	JS         *handler.JetStreamHandler
-	Mon        *handler.MonitorHandler
-	FrontendFS fs.FS
+	Pool          *pgxpool.Pool
+	JWTSecret     []byte
+	Authenticator middleware.Authenticator
+	APIKeys       *handler.APIKeysHandler
+	Auth          *handler.AuthHandler
+	Tenants       *handler.TenantsHandler
+	Creds         *handler.CredentialsHandler
+	JS            *handler.JetStreamHandler
+	Mon           *handler.MonitorHandler
+	FrontendFS    fs.FS
 }
 
 func NewRouter(d Deps) *chi.Mux {
@@ -35,7 +37,7 @@ func NewRouter(d Deps) *chi.Mux {
 		r.Post("/auth/login", d.Auth.Login)
 
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.RequireAdmin(d.JWTSecret))
+			r.Use(middleware.RequireAdmin(d.JWTSecret, d.Authenticator))
 			r.Post("/auth/refresh", d.Auth.Login)
 
 			r.Route("/tenants", func(r chi.Router) {
@@ -59,6 +61,11 @@ func NewRouter(d Deps) *chi.Mux {
 					r.Post("/jetstream/kv", d.JS.CreateKV)
 					r.Delete("/jetstream/kv/{bucket}", d.JS.DeleteKV)
 				})
+			})
+			r.Route("/settings/api-keys", func(r chi.Router) {
+				r.Post("/", d.APIKeys.Create)
+				r.Get("/", d.APIKeys.List)
+				r.Delete("/{id}", d.APIKeys.Revoke)
 			})
 			r.Get("/monitor/server", d.Mon.Servers)
 			r.Get("/monitor/tenants", d.Mon.Tenants)
