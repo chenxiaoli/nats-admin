@@ -10,24 +10,40 @@ export default function CreateKeyDialog({ open, onOpenChange }: Props) {
   const [name, setName] = useState('');
   const [created, setCreated] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copyErr, setCopyErr] = useState(false);
+  const [submitErr, setSubmitErr] = useState<string | null>(null);
   const create = useCreateAPIKey();
 
   function reset() {
     setName('');
     setCreated(null);
     setCopied(false);
+    setCopyErr(false);
+    setSubmitErr(null);
   }
 
   async function handleSubmit() {
     if (!name.trim()) return;
-    const resp = await create.mutateAsync(name.trim());
-    setCreated(resp.key);
+    setSubmitErr(null);
+    try {
+      const resp = await create.mutateAsync(name.trim());
+      setCreated(resp.key);
+    } catch (e: any) {
+      const msg = e?.response?.data?.message ?? e?.message ?? '创建失败';
+      setSubmitErr(typeof msg === 'string' ? msg : '创建失败');
+    }
   }
 
-  async function copy() {
+  async function handleCopy() {
     if (!created) return;
-    await navigator.clipboard.writeText(created);
-    setCopied(true);
+    setCopyErr(false);
+    try {
+      await navigator.clipboard.writeText(created);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopyErr(true);
+    }
   }
 
   if (!open) return null;
@@ -47,12 +63,17 @@ export default function CreateKeyDialog({ open, onOpenChange }: Props) {
                 {created}
               </code>
               <button
-                onClick={copy}
+                onClick={handleCopy}
                 className="rounded bg-slate-900 px-3 py-1 text-sm text-white"
               >
                 {copied ? '已复制' : '复制'}
               </button>
             </div>
+            {copyErr && (
+              <p className="mt-2 text-xs text-red-600">
+                复制失败，请手动选中复制
+              </p>
+            )}
           </div>
         ) : (
           <div className="mt-4">
@@ -61,8 +82,12 @@ export default function CreateKeyDialog({ open, onOpenChange }: Props) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="例如：ci-pipeline"
+              autoFocus
               className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
             />
+            {submitErr && (
+              <p className="mt-2 text-xs text-red-600">{submitErr}</p>
+            )}
           </div>
         )}
         <div className="mt-6 flex justify-end gap-2">
