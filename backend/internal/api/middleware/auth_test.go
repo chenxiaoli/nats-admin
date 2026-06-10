@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -37,7 +39,7 @@ func protectedHandler(w http.ResponseWriter, r *http.Request) {
 
 func runMiddleware(req *http.Request) *httptest.ResponseRecorder {
 	rr := httptest.NewRecorder()
-	mw := RequireAdmin([]byte(testSecret))(http.HandlerFunc(protectedHandler))
+	mw := RequireAdmin([]byte(testSecret), nil)(http.HandlerFunc(protectedHandler))
 	mw.ServeHTTP(rr, req)
 	return rr
 }
@@ -118,5 +120,59 @@ func TestRequireAdmin_ValidToken(t *testing.T) {
 	}
 	if body := rr.Body.String(); body != "ok" {
 		t.Fatalf("body: got %q", body)
+	}
+}
+
+type stubAuthenticator struct {
+	keyID, adminID uuid.UUID
+	err            error
+}
+
+func (s *stubAuthenticator) Validate(ctx context.Context, raw string) (keyID, adminID uuid.UUID, err error) {
+	return s.keyID, s.adminID, s.err
+}
+
+func TestRequireAdmin_APIKey_Valid(t *testing.T) {
+	adminID := uuid.New()
+	keyID := uuid.New()
+	stub := &stubAuthenticator{keyID: keyID, adminID: adminID}
+	var captured uuid.UUID
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = AdminID(r.Context())
+		w.WriteHeader(http.StatusOK)
+	})
+	mw := RequireAdmin([]byte(testSecret), stub)(handler)
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer nak_live_somekeyvalue")
+	rr := httptest.NewRecorder()
+	mw.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status: got %d, want 200", rr.Code)
+	}
+	if captured != adminID {
+		t.Fatalf("AdminID not set: got %v, want %v", captured, adminID)
+	}
+}
+
+func TestRequireAdmin_APIKey_Invalid(t *testing.T) {
+	stub := &stubAuthenticator{err: errors.New("not found")}
+	mw := RequireAdmin([]byte(testSecret), stub)(http.HandlerFunc(protectedHandler))
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer nak_live_bogus")
+	rr := httptest.NewRecorder()
+	mw.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("status: got %d, want 401", rr.Code)
+	}
+}
+
+func TestRequireAdmin_APIKey_NoAuthenticator(t *testing.T) {
+	mw := RequireAdmin([]byte(testSecret), nil)(http.HandlerFunc(protectedHandler))
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer nak_live_anything")
+	rr := httptest.NewRecorder()
+	mw.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("status: got %d, want 401", rr.Code)
 	}
 }
