@@ -32,6 +32,16 @@ func WithAudit(pool *pgxpool.Pool) func(http.Handler) http.Handler {
 
 			entry.adminID = AdminID(r.Context())
 			entry.tenantID = TenantID(r.Context())
+			if keyID := APIKeyID(r.Context()); keyID != uuid.Nil {
+				switch d := entry.detail.(type) {
+				case map[string]any:
+					d["api_key_id"] = keyID.String()
+				case nil:
+					entry.detail = map[string]any{"api_key_id": keyID.String()}
+				default:
+					entry.detail = map[string]any{"detail": d, "api_key_id": keyID.String()}
+				}
+			}
 			detail, _ := json.Marshal(entry.detail)
 			if pool == nil {
 				return

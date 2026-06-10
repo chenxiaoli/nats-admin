@@ -77,7 +77,16 @@ GET    /api/v1/monitor/server
 GET    /api/v1/monitor/tenants
 GET    /api/v1/monitor/tenants/:id
 WS     /api/v1/ws/monitor
+
+GET    /api/v1/settings/api-keys                  # 列出当前 admin 的 keys
+POST   /api/v1/settings/api-keys                  # 创建 key（原始值仅响应一次）
+DELETE /api/v1/settings/api-keys/:id              # 吊销（不可恢复）
 ```
+
+## 认证
+
+- 浏览器：`/api/v1/auth/login` 拿到 HS256 JWT，作为 `Authorization: Bearer <jwt>`
+- 后端/CI：API key `nak_live_<32 base62>`，同样 `Authorization: Bearer nak_live_...`；中间件按 `nak_live_` 前缀分流，SHA-256 散列后查表，命中即认证为对应 admin（权限继承）；revoke 立即失效
 
 ## 连接池（per-tenant）
 

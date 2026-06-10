@@ -66,6 +66,25 @@ CREATE TABLE admin_users (
 );
 ```
 
+## api_keys（后端服务访问凭证）
+
+```sql
+-- 不透明 key: nak_live_<32 base62>，仅签发时返回原文，DB 只存 SHA-256 散列
+CREATE TABLE api_keys (
+  id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  admin_id     UUID         NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+  name         VARCHAR(100) NOT NULL,
+  key_prefix   VARCHAR(12)  NOT NULL,   -- "nak_live"（UI 展示用）
+  key_hash     VARCHAR(64)  NOT NULL,   -- SHA-256 hex
+  last_used_at TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  revoked_at   TIMESTAMPTZ,
+  UNIQUE(admin_id, name)
+);
+-- 部分索引：仅活跃 key 才查 hash，吊销立即从查询集合移除
+CREATE INDEX api_keys_hash_idx ON api_keys(key_hash) WHERE revoked_at IS NULL;
+```
+
 ## audit_logs（append-only，不允许 UPDATE/DELETE）
 
 ```sql

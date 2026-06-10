@@ -16,6 +16,7 @@ React 18 + Vite + TypeScript + shadcn/ui + TailwindCSS + TanStack Query v5 + Rea
   ├── ?tab=jetstream        Streams / KV 管理
   └── ?tab=audit            操作日志
 /monitor                    实时监控（WebSocket，5s 刷新）
+/settings/api-keys          API Key 管理（创建、列表、吊销；原始 key 仅一次性显示）
 /settings                   Admin 用户管理
 ```
 
