@@ -2,15 +2,12 @@ package middleware
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type ctxKey int
@@ -37,9 +34,8 @@ const (
 	apiKeyPrefix          = "nak_live_"
 )
 
-// Authenticator is implemented by the api key service so the middleware
-// can resolve a raw key to (key id, admin id) without importing the full
-// service struct.
+// Authenticator resolves a raw API key to (key id, admin id). Implemented
+// by *apikey.Service.
 type Authenticator interface {
 	Validate(ctx context.Context, raw string) (keyID, adminID uuid.UUID, err error)
 }
@@ -54,6 +50,8 @@ func RequireAdmin(secret []byte, authenticator Authenticator) func(http.Handler)
 			}
 			raw := strings.TrimPrefix(h, "Bearer ")
 
+			// API keys do not expire, so no SessionExpired header is emitted
+			// for this path — only JWTs can be expired.
 			if strings.HasPrefix(raw, apiKeyPrefix) {
 				if authenticator == nil {
 					http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -98,28 +96,4 @@ func RequireAdmin(secret []byte, authenticator Authenticator) func(http.Handler)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
-}
-
-// NewAPIKeyAuthenticator returns an Authenticator backed by a pgx pool.
-// We define it here so the middleware package has no direct dependency on
-// the apikey service struct; it just needs the Validate contract.
-func NewAPIKeyAuthenticator(pool *pgxpool.Pool) Authenticator {
-	return &poolAuthenticator{pool: pool}
-}
-
-type poolAuthenticator struct {
-	pool *pgxpool.Pool
-}
-
-func (p *poolAuthenticator) Validate(ctx context.Context, raw string) (keyID, adminID uuid.UUID, err error) {
-	sum := sha256.Sum256([]byte(raw))
-	hash := hex.EncodeToString(sum[:])
-	err = p.pool.QueryRow(ctx,
-		`SELECT id, admin_id FROM api_keys WHERE key_hash = $1 AND revoked_at IS NULL`,
-		hash).Scan(&keyID, &adminID)
-	if err != nil {
-		return uuid.Nil, uuid.Nil, err
-	}
-	_, _ = p.pool.Exec(ctx, `UPDATE api_keys SET last_used_at = NOW() WHERE id = $1`, keyID)
-	return keyID, adminID, nil
 }

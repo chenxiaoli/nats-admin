@@ -136,9 +136,10 @@ func TestRequireAdmin_APIKey_Valid(t *testing.T) {
 	adminID := uuid.New()
 	keyID := uuid.New()
 	stub := &stubAuthenticator{keyID: keyID, adminID: adminID}
-	var captured uuid.UUID
+	var capturedAdmin, capturedKey uuid.UUID
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		captured = AdminID(r.Context())
+		capturedAdmin = AdminID(r.Context())
+		capturedKey = APIKeyID(r.Context())
 		w.WriteHeader(http.StatusOK)
 	})
 	mw := RequireAdmin([]byte(testSecret), stub)(handler)
@@ -149,8 +150,11 @@ func TestRequireAdmin_APIKey_Valid(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status: got %d, want 200", rr.Code)
 	}
-	if captured != adminID {
-		t.Fatalf("AdminID not set: got %v, want %v", captured, adminID)
+	if capturedAdmin != adminID {
+		t.Fatalf("AdminID: got %v, want %v", capturedAdmin, adminID)
+	}
+	if capturedKey != keyID {
+		t.Fatalf("APIKeyID: got %v, want %v", capturedKey, keyID)
 	}
 }
 
