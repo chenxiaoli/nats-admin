@@ -47,11 +47,14 @@ func (h *APIKeysHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	created, err := h.svc.Create(r.Context(), adminID, req.Name)
 	if err != nil {
+		if errors.Is(err, apikey.ErrNameConflict) {
+			http.Error(w, "name already exists", http.StatusConflict)
+			return
+		}
 		http.Error(w, "create failed", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(createKeyResp{
+	writeJSON(w, createKeyResp{
 		ID:        created.Key.ID,
 		Name:      created.Key.Name,
 		Key:       created.Raw,
@@ -77,8 +80,7 @@ func (h *APIKeysHandler) List(w http.ResponseWriter, r *http.Request) {
 			RevokedAt:  formatTimePtr(k.RevokedAt),
 		})
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(out)
+	writeJSON(w, out)
 }
 
 func (h *APIKeysHandler) Revoke(w http.ResponseWriter, r *http.Request) {

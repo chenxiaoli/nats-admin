@@ -10,6 +10,7 @@ import (
 	"math/big"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 var (
@@ -49,7 +50,10 @@ func (s *Service) Create(ctx context.Context, adminID uuid.UUID, name string) (*
 		KeyHash:   hash,
 	}
 	if err := s.repo.Insert(ctx, k); err != nil {
-		// Treat unique violation as conflict. Caller checks pg err code in tests if needed.
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return nil, ErrNameConflict
+		}
 		return nil, err
 	}
 	return &Created{Key: k, Raw: raw}, nil
