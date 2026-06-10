@@ -12,6 +12,7 @@ export default function APIKeysPage() {
   const revoke = useRevokeAPIKey();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<string | null>(null);
+  const [revokeErr, setRevokeErr] = useState<string | null>(null);
 
   return (
     <div className="p-6">
@@ -86,6 +87,7 @@ export default function APIKeysPage() {
           <div className="rounded-lg bg-white p-6 shadow-lg">
             <h3 className="mb-2 font-semibold">确认吊销</h3>
             <p className="mb-4 text-sm text-slate-600">吊销后此 key 立即失效，无法恢复。</p>
+            {revokeErr && <p className="mb-2 text-xs text-red-600">{revokeErr}</p>}
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setRevokeTarget(null)}
@@ -95,12 +97,19 @@ export default function APIKeysPage() {
               </button>
               <button
                 onClick={async () => {
-                  await revoke.mutateAsync(revokeTarget);
-                  setRevokeTarget(null);
+                  if (!revokeTarget) return;
+                  setRevokeErr(null);
+                  try {
+                    await revoke.mutateAsync(revokeTarget);
+                    setRevokeTarget(null);
+                  } catch (e: any) {
+                    setRevokeErr(e?.response?.data?.message ?? e?.message ?? '吊销失败');
+                  }
                 }}
-                className="rounded bg-red-600 px-3 py-1.5 text-sm text-white"
+                disabled={revoke.isPending}
+                className="rounded bg-red-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
               >
-                确认吊销
+                {revoke.isPending ? '吊销中…' : '确认吊销'}
               </button>
             </div>
           </div>
