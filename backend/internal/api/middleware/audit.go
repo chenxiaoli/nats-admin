@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"net"
 	"net/http"
 	"time"
 
@@ -33,12 +34,15 @@ func WithAudit(pool *pgxpool.Pool) func(http.Handler) http.Handler {
 			entry.tenantID = TenantID(r.Context())
 			detail, _ := json.Marshal(entry.detail)
 			if pool == nil {
-				// Audit disabled (e.g. unit tests that don't wire a DB).
 				return
+			}
+			host, _, _ := net.SplitHostPort(r.RemoteAddr)
+			if host == "" {
+				host = r.RemoteAddr
 			}
 			_, err := pool.Exec(r.Context(),
 				`INSERT INTO audit_logs (admin_id, tenant_id, action, resource, ip_addr, detail) VALUES ($1,$2,$3,$4,$5,$6)`,
-				entry.adminID, entry.tenantID, entry.action, entry.resource, r.RemoteAddr, detail)
+				entry.adminID, entry.tenantID, entry.action, entry.resource, host, detail)
 			if err != nil {
 				log.Printf("audit insert failed: %v", err)
 			}

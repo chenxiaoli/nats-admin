@@ -23,9 +23,11 @@ import (
 	"github.com/chenxiaoli/nats-admin/internal/operator"
 	"github.com/chenxiaoli/nats-admin/internal/tenant"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func runServer() error {
@@ -42,6 +44,10 @@ func runServer() error {
 		return fmt.Errorf("pgx pool: %w", err)
 	}
 	defer pool.Close()
+
+	if err := seedAdmin(ctx, pool, cfg); err != nil {
+		log.Printf("warn: seed admin: %v", err)
+	}
 
 	op, err := operator.LoadFromEnv()
 	if err != nil {
@@ -248,4 +254,29 @@ func mustSub(fsys embed.FS, dir string) fs.FS {
 		panic(err)
 	}
 	return sub
+}
+
+func seedAdmin(ctx context.Context, pool *pgxpool.Pool, cfg *config.Config) error {
+	if cfg.BootstrapAdminEmail == "" || cfg.BootstrapAdminPassword == "" {
+		return nil
+	}
+	var count int
+	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM admin_users`).Scan(&count); err != nil {
+		return fmt.Errorf("check admin_users: %w", err)
+	}
+	if count > 0 {
+		return nil
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(cfg.BootstrapAdminPassword), 12)
+	if err != nil {
+		return fmt.Errorf("bcrypt: %w", err)
+	}
+	_, err = pool.Exec(ctx,
+		`INSERT INTO admin_users (email, password_hash, role) VALUES ($1, $2, 'super')`,
+		cfg.BootstrapAdminEmail, string(hash))
+	if err != nil {
+		return fmt.Errorf("insert admin: %w", err)
+	}
+	log.Printf("bootstrapped admin user: %s", cfg.BootstrapAdminEmail)
+	return nil
 }
