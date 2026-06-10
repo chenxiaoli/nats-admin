@@ -14,6 +14,7 @@ import TenantCredentials from './pages/tenants/detail/credentials';
 import TenantJetStream from './pages/tenants/detail/jetstream';
 import TenantAudit from './pages/tenants/detail/audit';
 import MonitorPage from './pages/monitor';
+import APIKeysPage from './pages/settings/api-keys';
 
 const router = createBrowserRouter([
   {
@@ -45,6 +46,7 @@ const router = createBrowserRouter([
         ],
       },
       { path: 'monitor', element: <MonitorPage /> },
+      { path: 'settings/api-keys', element: <APIKeysPage /> },
     ],
   },
 ]);
